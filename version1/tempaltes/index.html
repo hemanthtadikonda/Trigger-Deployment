@@ -1,0 +1,98 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>K8s Portal — Simple</title>
+    <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body>
+<div class="container">
+    <h1>Kubernetes Portal (Simple & Clear)</h1>
+
+    <div class="card">
+        <h2>Cluster Credentials (used across all actions)</h2>
+        <form id="credForm">
+            <label>API Server (https://...)</label>
+            <input id="api" name="api" placeholder="https://api-server:6443" />
+            <label>Bearer Token</label>
+            <textarea id="token" name="token" placeholder="paste serviceaccount token"></textarea>
+            <label>Namespace (default)</label>
+            <input id="namespace" name="namespace" placeholder="default" />
+            <label><input id="skip_tls" name="skip_tls" type="checkbox" /> Skip TLS verify (testing only)</label>
+            <label>CA cert (PEM) (optional)</label>
+            <textarea id="ca_cert" name="ca_cert" placeholder="-----BEGIN CERTIFICATE-----..."></textarea>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2>Create Deployment</h2>
+        <form method="post" action="/deploy" onsubmit="attachCreds(this);">
+            <label>Deployment name</label><input name="name" required />
+            <label>Image (e.g. nginx:1.25)</label><input name="image" required />
+            <label>Replicas</label><input name="replicas" value="1" />
+            <button type="submit">Apply Deployment</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2>Create Service</h2>
+        <form method="post" action="/service" onsubmit="attachCreds(this);">
+            <label>Service name</label><input name="name" required />
+            <label>Port</label><input name="port" value="80" />
+            <label>Target Port</label><input name="targetPort" value="80" />
+            <button type="submit">Apply Service</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2>Custom YAML</h2>
+        <form method="post" action="/custom" onsubmit="attachCreds(this);">
+            <label>Paste YAML</label>
+            <textarea name="yaml" rows="10" required></textarea>
+            <button type="submit">Apply YAML</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2>Delete Resource</h2>
+        <form method="post" action="/delete" onsubmit="attachCreds(this);">
+            <label>Kind (Deployment, Service, ConfigMap, ...)</label><input name="kind" required />
+            <label>Name</label><input name="name" required />
+            <button type="submit">Delete</button>
+        </form>
+    </div>
+
+</div>
+
+<script>
+    // Copy credentials into forms before submit
+    function attachCreds(form) {
+      const api = document.getElementById('api').value;
+      const token = document.getElementById('token').value;
+      const ns = document.getElementById('namespace').value;
+      const skip = document.getElementById('skip_tls').checked ? 'on' : '';
+      const ca = document.getElementById('ca_cert').value;
+
+      // create hidden inputs
+      const inputs = [
+        {name:'api', value: api},
+        {name:'token', value: token},
+        {name:'namespace', value: ns},
+        {name:'skip_tls', value: skip},
+        {name:'ca_cert', value: ca}
+      ];
+      inputs.forEach(i => {
+        let el = form.querySelector('input[name=\"'+i.name+'"], textarea[name=\"'+i.name+'\"]');
+        if (!el) {
+          el = document.createElement(i.name === 'ca_cert' ? 'textarea' : 'input');
+          el.type = 'hidden';
+          el.name = i.name;
+          form.appendChild(el);
+        }
+        el.value = i.value;
+      });
+      return true; // continue submit
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,66 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Result - K8s Portal</title>
+    <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body>
+<div class="container">
+    <h1>Result</h1>
+
+    <div class="card">
+        <h2>{{ kind }} : {{ name }}</h2>
+        <h3>Applied YAML</h3>
+        <pre class="yaml">{{ yaml }}</pre>
+
+        <h3>kubectl stdout</h3>
+        <pre class="out">{{ stdout }}</pre>
+
+        <h3>kubectl stderr</h3>
+        <pre class="err">{{ stderr }}</pre>
+
+        <p>Status:
+            {% if ok %}
+            <span class="ok">OK</span>
+            {% else %}
+            <span class="err">ERROR</span>
+            {% endif %}
+        </p>
+    </div>
+
+    <div class="card">
+        <h3>Quick Delete</h3>
+        <form method="post" action="/delete" onsubmit="attachCreds(this);">
+            <input type="hidden" name="api" value="{{ request.form.get('api','') }}">
+            <input type="hidden" name="token" value="{{ request.form.get('token','') }}">
+            <label>Namespace</label><input name="namespace" value="{{ request.form.get('namespace','default') }}">
+            <label>Kind</label><input name="kind" value="{{ kind }}">
+            <label>Name</label><input name="name" value="{{ name }}">
+            <button type="submit">Delete</button>
+        </form>
+    </div>
+
+    <p><a href="/">Back</a></p>
+</div>
+
+<script>
+    function attachCreds(form) {
+      // copy api/token from hidden inputs if present on page
+      const api = document.querySelector('input[name=\"api\"]')?.value || '';
+      const token = document.querySelector('input[name=\"token\"]')?.value || '';
+      if (api) {
+        let a = form.querySelector('input[name=\"api\"]');
+        if(!a){ a = document.createElement('input'); a.type='hidden'; a.name='api'; form.appendChild(a); }
+        a.value = api;
+      }
+      if (token) {
+        let t = form.querySelector('input[name=\"token\"]');
+        if(!t){ t = document.createElement('input'); t.type='hidden'; t.name='token'; form.appendChild(t); }
+        t.value = token;
+      }
+      return true;
+    }
+  </script>
+</body>
+</html>
