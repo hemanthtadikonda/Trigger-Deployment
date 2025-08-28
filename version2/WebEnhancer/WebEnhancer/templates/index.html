@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kubernetes Deployment Portal</title>
+    <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/styles.css') }}" rel="stylesheet">
+</head>
+<body>
+    <div class="container-fluid">
+        <!-- Header -->
+        <header class="py-3 mb-4 border-bottom">
+            <div class="d-flex align-items-center justify-content-between">
+                <h1 class="h3 mb-0">
+                    <i class="fas fa-dharmachakra me-2"></i>
+                    Kubernetes Deployment Portal
+                </h1>
+                <div class="cluster-status">
+                    {% if session.cluster_connected %}
+                        <span class="badge bg-success">
+                            <i class="fas fa-check-circle me-1"></i>
+                            Connected to {{ session.cluster_name }}
+                        </span>
+                        <form method="post" action="{{ url_for('disconnect_cluster') }}" class="d-inline ms-2">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                <i class="fas fa-sign-out-alt me-1"></i>Disconnect
+                            </button>
+                        </form>
+                    {% else %}
+                        <span class="badge bg-warning">
+                            <i class="fas fa-exclamation-triangle me-1"></i>
+                            Not Connected
+                        </span>
+                    {% endif %}
+                </div>
+            </div>
+        </header>
+
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="alert-container mb-4">
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                            <i class="fas fa-{{ 'exclamation-circle' if category == 'error' else 'info-circle' if category == 'info' else 'check-circle' }} me-2"></i>
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <div class="row">
+            <!-- Cluster Connection Panel -->
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-server me-2"></i>
+                            Cluster Connection
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% if not session.cluster_connected %}
+                            <form method="post" action="{{ url_for('connect_cluster') }}">
+                                <div class="mb-3">
+                                    <label for="endpoint" class="form-label">Cluster Endpoint</label>
+                                    <input type="url" class="form-control" id="endpoint" name="endpoint" 
+                                           placeholder="https://cluster-api.example.com" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="cluster_name" class="form-label">Cluster Name</label>
+                                    <input type="text" class="form-control" id="cluster_name" name="cluster_name" 
+                                           placeholder="production-cluster" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="token" class="form-label">Service Account Token</label>
+                                    <textarea class="form-control" id="token" name="token" rows="3" 
+                                              placeholder="eyJhbGciOiJSUzI1NiIs..." required></textarea>
+                                </div>
+                                <button type="submit" class="btn btn-primary w-100">
+                                    <i class="fas fa-link me-2"></i>Connect to Cluster
+                                </button>
+                            </form>
+                        {% else %}
+                            <div class="text-center">
+                                <i class="fas fa-check-circle text-success fa-3x mb-3"></i>
+                                <h6>Connected to:</h6>
+                                <p class="mb-1"><strong>{{ session.cluster_name }}</strong></p>
+                                <p class="text-muted small">{{ session.cluster_endpoint }}</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Command Output Panel -->
+                {% if session.last_output %}
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <h6 class="card-title mb-0">
+                            <i class="fas fa-terminal me-2"></i>
+                            Last Command Output
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <pre class="command-output">{{ session.last_output }}</pre>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Main Operations Panel -->
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <!-- Tab Navigation -->
+                        <ul class="nav nav-tabs card-header-tabs" id="operationTabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="deployment-tab" data-bs-toggle="tab" 
+                                        data-bs-target="#deployment" type="button" role="tab">
+                                    <i class="fas fa-rocket me-2"></i>Deployments
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="service-tab" data-bs-toggle="tab" 
+                                        data-bs-target="#service" type="button" role="tab">
+                                    <i class="fas fa-network-wired me-2"></i>Services
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="custom-tab" data-bs-toggle="tab" 
+                                        data-bs-target="#custom" type="button" role="tab">
+                                    <i class="fas fa-terminal me-2"></i>Custom Commands
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="yaml-tab" data-bs-toggle="tab" 
+                                        data-bs-target="#yaml" type="button" role="tab">
+                                    <i class="fas fa-file-code me-2"></i>Custom YAML
+                                </button>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="card-body">
+                        <!-- Tab Content -->
+                        <div class="tab-content" id="operationTabsContent">
+                            <!-- Deployment Tab -->
+                            <div class="tab-pane fade show active" id="deployment" role="tabpanel">
+                                <h5 class="mb-4">Create Deployment</h5>
+                                <form method="post" action="{{ url_for('create_deployment') }}">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="deployment_name" class="form-label">Deployment Name</label>
+                                                <input type="text" class="form-control" id="deployment_name" 
+                                                       name="deployment_name" placeholder="my-app" required>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="deployment_image" class="form-label">Container Image</label>
+                                                <input type="text" class="form-control" id="deployment_image" 
+                                                       name="deployment_image" placeholder="nginx:latest" required>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label for="deployment_replicas" class="form-label">Replicas</label>
+                                                <input type="number" class="form-control" id="deployment_replicas" 
+                                                       name="deployment_replicas" value="1" min="1" max="10">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label for="deployment_port" class="form-label">Container Port</label>
+                                                <input type="number" class="form-control" id="deployment_port" 
+                                                       name="deployment_port" value="80" min="1" max="65535">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label for="deployment_namespace" class="form-label">Namespace</label>
+                                                <input type="text" class="form-control" id="deployment_namespace" 
+                                                       name="deployment_namespace" value="default">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button type="submit" class="btn btn-success" 
+                                            {{ 'disabled' if not session.cluster_connected }}>
+                                        <i class="fas fa-plus me-2"></i>Create Deployment
+                                    </button>
+                                </form>
+                            </div>
+
+                            <!-- Service Tab -->
+                            <div class="tab-pane fade" id="service" role="tabpanel">
+                                <h5 class="mb-4">Create Service</h5>
+                                <form method="post" action="{{ url_for('create_service') }}">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="service_name" class="form-label">Service Name</label>
+                                                <input type="text" class="form-control" id="service_name" 
+                                                       name="service_name" placeholder="my-service" required>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label for="service_type" class="form-label">Service Type</label>
+                                                <select class="form-select" id="service_type" name="service_type">
+                                                    <option value="ClusterIP">ClusterIP</option>
+                                                    <option value="NodePort">NodePort</option>
+                                                    <option value="LoadBalancer">LoadBalancer</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label for="service_port" class="form-label">Service Port</label>
+                                                <input type="number" class="form-control" id="service_port" 
+                                                       name="service_port" value="80" min="1" max="65535">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label for="service_target_port" class="form-label">Target Port</label>
+                                                <input type="number" class="form-control" id="service_target_port" 
+                                                       name="service_target_port" value="80" min="1" max="65535">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label for="service_namespace" class="form-label">Namespace</label>
+                                                <input type="text" class="form-control" id="service_namespace" 
+                                                       name="service_namespace" value="default">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button type="submit" class="btn btn-success" 
+                                            {{ 'disabled' if not session.cluster_connected }}>
+                                        <i class="fas fa-plus me-2"></i>Create Service
+                                    </button>
+                                </form>
+                            </div>
+
+                            <!-- Custom Tab -->
+                            <div class="tab-pane fade" id="custom" role="tabpanel">
+                                <h5 class="mb-4">Execute Custom Command</h5>
+                                <form method="post" action="{{ url_for('execute_custom') }}">
+                                    <div class="mb-3">
+                                        <label for="custom_command" class="form-label">kubectl Command</label>
+                                        <input type="text" class="form-control" id="custom_command" 
+                                               name="custom_command" placeholder="kubectl get pods -n default" required>
+                                        <div class="form-text">
+                                            <i class="fas fa-info-circle me-1"></i>
+                                            Enter any kubectl command. Commands must start with "kubectl".
+                                        </div>
+                                    </div>
+                                    <button type="submit" class="btn btn-success" 
+                                            {{ 'disabled' if not session.cluster_connected }}>
+                                        <i class="fas fa-play me-2"></i>Execute Command
+                                    </button>
+                                </form>
+
+                                <!-- Quick Commands -->
+                                <div class="mt-4">
+                                    <h6>Quick Commands:</h6>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <button class="btn btn-sm btn-outline-secondary quick-cmd" 
+                                                data-cmd="kubectl get pods">Get Pods</button>
+                                        <button class="btn btn-sm btn-outline-secondary quick-cmd" 
+                                                data-cmd="kubectl get services">Get Services</button>
+                                        <button class="btn btn-sm btn-outline-secondary quick-cmd" 
+                                                data-cmd="kubectl get deployments">Get Deployments</button>
+                                        <button class="btn btn-sm btn-outline-secondary quick-cmd" 
+                                                data-cmd="kubectl get nodes">Get Nodes</button>
+                                        <button class="btn btn-sm btn-outline-secondary quick-cmd" 
+                                                data-cmd="kubectl get namespaces">Get Namespaces</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Custom YAML Tab -->
+                            <div class="tab-pane fade" id="yaml" role="tabpanel">
+                                <h5 class="mb-4">Execute Custom YAML</h5>
+                                <form method="post" action="{{ url_for('execute_yaml') }}">
+                                    <div class="mb-3">
+                                        <label for="custom_yaml" class="form-label">YAML Manifest</label>
+                                        <textarea class="form-control" id="custom_yaml" name="custom_yaml" 
+                                                  rows="15" placeholder="apiVersion: v1
+kind: Pod
+metadata:
+  name: my-pod
+  namespace: default
+spec:
+  containers:
+  - name: my-container
+    image: nginx:latest
+    ports:
+    - containerPort: 80" required></textarea>
+                                        <div class="form-text">
+                                            <i class="fas fa-info-circle me-1"></i>
+                                            Enter your YAML manifest. It will be applied using 'kubectl apply -f -'.
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="yaml_namespace" class="form-label">Namespace (optional)</label>
+                                        <input type="text" class="form-control" id="yaml_namespace" 
+                                               name="yaml_namespace" placeholder="default">
+                                        <div class="form-text">
+                                            Override namespace for resources that don't specify one.
+                                        </div>
+                                    </div>
+                                    <button type="submit" class="btn btn-success" 
+                                            {{ 'disabled' if not session.cluster_connected }}>
+                                        <i class="fas fa-upload me-2"></i>Apply YAML
+                                    </button>
+                                </form>
+
+                                <!-- YAML Templates -->
+                                <div class="mt-4">
+                                    <h6>Quick YAML Templates:</h6>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <button class="btn btn-sm btn-outline-info yaml-template" 
+                                                data-template="pod">Pod Template</button>
+                                        <button class="btn btn-sm btn-outline-info yaml-template" 
+                                                data-template="deployment">Deployment Template</button>
+                                        <button class="btn btn-sm btn-outline-info yaml-template" 
+                                                data-template="service">Service Template</button>
+                                        <button class="btn btn-sm btn-outline-info yaml-template" 
+                                                data-template="configmap">ConfigMap Template</button>
+                                        <button class="btn btn-sm btn-outline-info yaml-template" 
+                                                data-template="secret">Secret Template</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
