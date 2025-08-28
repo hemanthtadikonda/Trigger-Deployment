@@ -61,7 +61,7 @@ install_kubectl() {
     
     if command_exists kubectl; then
         log_success "kubectl is already installed"
-        kubectl version --client --short
+        kubectl version --client
         return 0
     fi
     
