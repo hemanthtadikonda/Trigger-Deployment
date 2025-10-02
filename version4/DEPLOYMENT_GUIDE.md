@@ -133,10 +133,12 @@ Create required tables.
 ```bash
 python3
 ```
+```
 from app import db, app
 
 with app.app_context():
-db.create_all()
+    db.create_all()
+
 ```
 Exit the Python shell:
 ```bash
